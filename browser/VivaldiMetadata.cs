@@ -14,7 +14,6 @@ internal static class VivaldiMetadata
 
     internal static JsonObject Read(string profileDirectory)
     {
-        var prefs = Path.Combine(profileDirectory, "Preferences");
         var directory = Path.Combine(profileDirectory, "Sessions");
         var latest = Directory.EnumerateFiles(directory, "Session_*")
             .Where(p => long.TryParse(Path.GetFileName(p).AsSpan(8), out _))
@@ -54,7 +53,12 @@ internal static class VivaldiMetadata
             (kind == 21 ? tabs : windows)[id] = allowed;
         }
 
-        using var prefStream = new FileStream(prefs, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var workspaces=Catalogue(profileDirectory);
+        return new JsonObject { ["type"]="metadata", ["live"]=false, ["workspaces"]=workspaces, ["tabs"]=tabs, ["windows"]=windows };
+    }
+    internal static JsonArray Catalogue(string profileDirectory)
+    {
+        using var prefStream = new FileStream(Path.Combine(profileDirectory,"Preferences"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         if (prefStream.Length > 64L * 1024 * 1024) throw new InvalidDataException("Файл Preferences слишком большой.");
         var root = JsonNode.Parse(prefStream);
         var workspaces = new JsonArray();
@@ -66,6 +70,7 @@ internal static class VivaldiMetadata
                 if (entry[key] != null) item[key] = entry[key]!.DeepClone();
             workspaces.Add(item);
         }
-        return new JsonObject { ["type"]="metadata", ["live"]=false, ["workspaces"]=workspaces, ["tabs"]=tabs, ["windows"]=windows };
+        return workspaces;
     }
 }
+

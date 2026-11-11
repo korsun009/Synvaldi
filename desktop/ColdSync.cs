@@ -5,7 +5,7 @@ namespace Synvaldi;
 
 internal sealed partial class Agent
 {
-    internal static JsonArray Catalogue(string folder) => VivaldiMetadata.Read(folder)["workspaces"]!.AsArray();
+    internal static JsonArray Catalogue(string folder) => VivaldiMetadata.Catalogue(folder);
     private static string ColdIdentity(string folder) => new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(folder).TrimEnd(Path.DirectorySeparatorChar).ToUpperInvariant())).AsSpan(0,16)).ToString();
     private static JsonObject ColdFields(JsonObject state,string[] pins)
     {
