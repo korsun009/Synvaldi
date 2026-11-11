@@ -26,6 +26,19 @@ try
     var none = await PreferencesAdapter.Capture(dir,[],Upload);
     if(none.Count!=0 || uploads!=1) throw new Exception("Category isolation failed");
     Console.WriteLine("PASS appearance, referenced PNG, digest, Unicode, local path removal, disabled categories");
+    var bookmarkId=Guid.NewGuid().ToString();
+    const string thumb="chrome://vivaldi-data/thumbnail/bg123.png";
+    var bookmarks=new JsonObject{["roots"]=new JsonObject{["bar"]=new JsonObject{["children"]=new JsonArray(
+        new JsonObject{["type"]="url",["guid"]=bookmarkId,["url"]="https://example.org/",["meta_info"]=new JsonObject{["Thumbnail"]=thumb}})}}};
+    Directory.CreateDirectory(Path.Combine(dir,"VivaldiThumbnails"));
+    File.Copy(image,Path.Combine(dir,"VivaldiThumbnails","bg123.png"));
+    File.WriteAllText(Path.Combine(dir,"Bookmarks"),bookmarks.ToJsonString());
+    var captured=await PreferencesAdapter.Capture(dir,["appearance"],Upload);
+    if(captured["asset/thumbnail/"+bookmarkId]?.ToString().Length!=64) throw new Exception("Missing thumbnail");
+    await PreferencesAdapter.Apply(dir,["appearance"],captured,Path.Combine(dir,"assets"),h=>File.ReadAllBytesAsync(image));
+    var roundtrip=await PreferencesAdapter.Capture(dir,["appearance"],Upload);
+    if(!JsonNode.DeepEquals(roundtrip,captured))throw new Exception("Thumbnail/appearance restore failed");
+    Console.WriteLine("PASS referenced speed dial image, GUID binding and cold round trip");
     if(args.Length==3 && args[0]=="--roundtrip-note"){
         var files=new Dictionary<string,byte[]>();
         var note=await PreferencesAdapter.Capture(args[1],["attachments"],(sha,bytes)=>{files[sha]=bytes;return Task.CompletedTask;});

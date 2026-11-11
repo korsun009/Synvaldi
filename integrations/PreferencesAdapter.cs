@@ -29,7 +29,7 @@ public static class PreferencesAdapter
     }
     static bool ValidImageId(string id) => Regex.IsMatch(id, @"\A[A-Za-z0-9_-]{1,120}(?:\.[A-Za-z0-9]{1,8})?\z");
     static string Hash(byte[] data) => Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
-    static string? Extension(byte[] bytes)
+    internal static string? Extension(byte[] bytes)
     {
         ReadOnlySpan<byte> data = bytes;
         if (data.StartsWith(new byte[]{137,80,78,71,13,10,26,10})) return ".png";
@@ -44,6 +44,7 @@ public static class PreferencesAdapter
     {
         var prefs = Read(Path.Combine(profilePath,"Preferences"));
         var fields = new JsonObject();
+        if(enabledCategories.Contains("appearance")) await SpeedDialImages.Capture(profilePath,fields,upload);
         if(enabledCategories.Contains("attachments")) await NoteAttachments.Capture(profilePath,fields,upload);
         if(prefs["vivaldi"] is not JsonObject vivaldi) return fields;
         var owned = NativeSyncKeys(prefs);
@@ -102,6 +103,23 @@ public static class PreferencesAdapter
         finally { if(File.Exists(temp)) File.Delete(temp); }
     }
 
+    [System.Runtime.InteropServices.DllImport("shell32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, SetLastError=true)]
+    private static extern IntPtr CommandLineToArgvW(string command,out int count);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr data);
+    static string[] Arguments(string command)
+    {
+        var buffer=CommandLineToArgvW(command,out int count);
+        if(buffer==IntPtr.Zero) throw new IOException("Unable to verify browser profile lock.");
+        try
+        {
+            var result=new string[count];
+            for(int i=0;i<count;i++)result[i]=System.Runtime.InteropServices.Marshal.PtrToStringUni(
+                System.Runtime.InteropServices.Marshal.ReadIntPtr(buffer,i*IntPtr.Size)) ?? "";
+            return result;
+        }
+        finally { LocalFree(buffer); }
+    }
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public static bool ProfileInUse(string profilePath)
     {
@@ -114,9 +132,11 @@ public static class PreferencesAdapter
             {
                 string? cmd=p["CommandLine"] as string;
                 if(string.IsNullOrEmpty(cmd)) return true;
-                if(cmd.Contains("--type=",StringComparison.OrdinalIgnoreCase)) continue;
-                var match=Regex.Match(cmd,"--user-data-dir=(?:\"([^\"]+)\"|([^\\s]+))",RegexOptions.IgnoreCase);
-                var dir=match.Success?(match.Groups[1].Success?match.Groups[1].Value:match.Groups[2].Value):
+                var args=Arguments(cmd);
+                if(args.Any(arg=>arg.StartsWith("--type=",StringComparison.OrdinalIgnoreCase)))continue;
+                const string prefix="--user-data-dir=";
+                string? location=args.FirstOrDefault(arg=>arg.StartsWith(prefix,StringComparison.OrdinalIgnoreCase));
+                var dir=location!=null?location[prefix.Length..]:
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Vivaldi","User Data");
                 if(string.Equals(Path.GetFullPath(dir),parent,StringComparison.OrdinalIgnoreCase))return true;
             }
@@ -171,6 +191,7 @@ public static class PreferencesAdapter
         CheckCold(profilePath);
         if(!JsonNode.DeepEquals(map,originalMap)) Write(mapFile,map);
         if(!JsonNode.DeepEquals(prefs,original)) Write(file,prefs);
+        if(enabledCategories.Contains("appearance")) await SpeedDialImages.Apply(profilePath,fields,download,()=>CheckCold(profilePath));
         if(enabledCategories.Contains("attachments")) await NoteAttachments.Apply(profilePath,fields,assetsRoot,download,()=>CheckCold(profilePath));
     }
 }
