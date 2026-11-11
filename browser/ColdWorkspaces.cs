@@ -143,6 +143,34 @@ public static class ColdWorkspaces
             result["tiling"]=new JsonObject{["id"]=tileId,["index"]=n,["layout"]=layout,["type"]=type};
         return result;
     }
+    static JsonNode CleanTree(JsonNode? node,HashSet<int> leaves,int depth=0)
+    {
+        if(depth>24 || leaves.Count>2000)throw new InvalidDataException("Раскладка плиток слишком велика.");
+        if(node is JsonValue leaf && leaf.TryGetValue<int>(out int n) && n is >=0 and <=10000 && leaves.Add(n))
+            return JsonValue.Create(n)!;
+        if(node is not JsonObject split || Text(split["direction"],8) is not ("row" or "column"))
+            throw new InvalidDataException("Неизвестный формат раскладки плиток.");
+        var clean=new JsonObject{["direction"]=split["direction"]!.DeepClone(),["first"]=CleanTree(split["first"],leaves,depth+1),
+            ["second"]=CleanTree(split["second"],leaves,depth+1)};
+        if(split["splitPercentage"] is {} ratio)
+        {
+            if(!double.TryParse(ratio.ToString(),NumberStyles.Float,CultureInfo.InvariantCulture,out var value) || !double.IsFinite(value) || value<=0 || value>=100)
+                throw new InvalidDataException("Недопустимая доля плитки.");
+            clean["splitPercentage"]=value;
+        }
+        return clean;
+    }
+    static JsonObject? Layout(string win,string tile,JsonNode? source,IEnumerable<int> members)
+    {
+        if(source==null)return null;
+        var leaves=new HashSet<int>();var tree=CleanTree(source,leaves);
+        // A tree that also covers an unselected or local-only tab stays on the source.
+        if(leaves.Count<2 || !leaves.SetEquals(members))return null;
+        return new JsonObject{["windowId"]=win,["id"]=tile,["tree"]=tree};
+    }
+    static int[] TileIndices(JsonArray rows,string windowId,string tile) => rows.OfType<JsonObject>()
+        .Where(row=>row["windowId"]?.ToString()==windowId && row["tiling"]?["id"]?.ToString()==tile)
+        .Select(row=>row["tiling"]!["index"]!.GetValue<int>()).ToArray();
     static JsonObject Export(JsonObject prefs,Image image,string[] pins)
     {
         var fields=new JsonObject();
@@ -151,7 +179,7 @@ public static class ColdWorkspaces
         {
             string? id=Number(w?["id"]);
             if (id==null || !selected.Contains(id)) continue;
-            var rows=new JsonArray();
+            var rows=new JsonArray();var layouts=new JsonArray();
             var entry=new JsonObject {["id"]=id,["name"]=Text(w!["name"],512)??"",["icon"]=Text(w["icon"],128)??"",["emoji"]=Text(w["emoji"],64)??"",["tabs"]=rows};
             foreach (var group in image.Tabs.Values.Where(t=>t.Workspace==id && Web(t.Url)).GroupBy(t=>t.Window)
                 .OrderBy(g=>Uuid(image.Windows[g.Key]["ext_id"]),StringComparer.Ordinal))
@@ -165,7 +193,13 @@ public static class ColdWorkspaces
                     row["windowId"]=windowId; row["url"]=t.Url; row["pinned"]=t.Pinned; row["index"]=index++;
                     rows.Add(row);
                 }
+                foreach(var tile in group.Select(t=>Text(t.Meta["tiling"]?["id"],128)).OfType<string>().Distinct().Order(StringComparer.Ordinal))
+                {
+                    var layout=Layout(windowId,tile,image.Windows[group.Key]["tiles"]?[tile],TileIndices(rows,windowId,tile));
+                    if(layout!=null)layouts.Add(layout);
+                }
             }
+            if(layouts.Count>0)entry["layouts"]=layouts;
             fields.Add(Prefix+id,entry);
         }
         return fields;
@@ -253,7 +287,20 @@ public static class ColdWorkspaces
             clean["id"]=id;clean["windowId"]=win;clean["url"]=url;clean["pinned"]=pinned;clean["index"]=n;rows.Add(clean);
         }
         if(rows.Count!=tabs.Count) throw new InvalidDataException("Некорректный список вкладок.");
-        return new JsonObject{["id"]=key,["name"]=name,["icon"]=Text(input["icon"],128)??"",["emoji"]=Text(input["emoji"],64)??"",["tabs"]=rows};
+        var result=new JsonObject{["id"]=key,["name"]=name,["icon"]=Text(input["icon"],128)??"",["emoji"]=Text(input["emoji"],64)??"",["tabs"]=rows};
+        if(input["layouts"] is JsonArray supplied && supplied.Count>0)
+        {
+            var layouts=new JsonArray();var seen=new HashSet<(string,string)>();
+            foreach(var layout in supplied.OfType<JsonObject>().OrderBy(o=>o["windowId"]?.ToString(),StringComparer.Ordinal).ThenBy(o=>o["id"]?.ToString(),StringComparer.Ordinal))
+            {
+                string? windowId=Uuid(layout["windowId"]),id=Text(layout["id"],128);
+                if(windowId==null || string.IsNullOrEmpty(id) || !seen.Add((windowId,id)))throw new InvalidDataException("Некорректный идентификатор раскладки.");
+                layouts.Add(Layout(windowId,id,layout["tree"],TileIndices(rows,windowId,id))??throw new InvalidDataException("Дерево раскладки не совпадает с вкладками."));
+            }
+            if(layouts.Count!=supplied.Count)throw new InvalidDataException("Некорректная раскладка.");
+            result["layouts"]=layouts;
+        }
+        return result;
     }
     public static void Apply(string profileDir,JsonObject snapshot,string[] pins) => ApplyCore(profileDir,snapshot,pins,false);
 
@@ -266,7 +313,7 @@ public static class ColdWorkspaces
             Recover(profileDir,marker,generation,input);
         }
         var old=Capture(profileDir,pins);
-        foreach(var item in old) item.Value!["tabs"]=new JsonArray();
+        foreach(var item in old){item.Value!["tabs"]=new JsonArray();item.Value!.AsObject().Remove("layouts");}
         ApplyCore(profileDir,old,pins,true);
     }
 
@@ -301,6 +348,16 @@ public static class ColdWorkspaces
         var positions=image.Tabs.Values.GroupBy(t=>t.Window).ToDictionary(g=>g.Key,g=>g.Max(t=>t.Order)+1);
         var catalog=((prefs["vivaldi"]!["workspaces"]??=new JsonObject())["list"]??=new JsonArray()).AsArray();
         var journal=Pack(w=>{
+            var changedWindows=new Dictionary<int,JsonObject>();
+            JsonObject WindowData(int win,string stable)
+            {
+                if(!changedWindows.TryGetValue(win,out var meta))changedWindows[win]=meta=image.Windows.GetValueOrDefault(win)?.DeepClone().AsObject()??new JsonObject{["ext_id"]=stable};
+                return meta;
+            }
+            foreach(var field in before)
+                foreach(var layout in field.Value?["layouts"] as JsonArray??[])
+                    if(nativeWins.TryGetValue(layout!["windowId"]!.ToString(),out var win) && WindowData(win,layout["windowId"]!.ToString())["tiles"] is JsonObject trees)
+                        trees.Remove(layout["id"]!.ToString());
             foreach(var pair in incoming)
             {
                 string key=pair.Key;var cloud=pair.Value;
@@ -343,7 +400,18 @@ public static class ColdWorkspaces
                     foreach(var field in Decorations(row))meta[field.Key]=field.Value?.DeepClone();
                     meta["ext_id"]=id;meta["workspaceId"]=double.Parse(key,CultureInfo.InvariantCulture);SetMeta(w,21,tab,meta);
                 }
+                if(!detach)
+                    foreach(var layout in cloud["layouts"] as JsonArray??[])
+                    {
+                        string windowId=layout!["windowId"]!.ToString(),tile=layout["id"]!.ToString();
+                        int win=nativeWins[windowId];
+                        if(image.Tabs.Values.Any(t=>t.Window==win && t.Meta["tiling"]?["id"]?.ToString()==tile && (t.Workspace==null || !selected.Contains(t.Workspace) || !Web(t.Url))))
+                            throw new InvalidDataException("Часть раскладки принадлежит невыбранным вкладкам.");
+                        var graphs=(WindowData(win,windowId)["tiles"]??=new JsonObject()).AsObject();
+                        graphs[tile]=layout["tree"]!.DeepClone();
+                    }
             }
+            foreach(var win in changedWindows)SetMeta(w,22,win.Key,win.Value);
         });
         string temp=session+"."+Guid.NewGuid().ToString("N")+".tmp", newPrefs=prefFile+"."+Guid.NewGuid().ToString("N")+".tmp";
         string backupDir=Path.Combine(backupRoot,Guid.NewGuid().ToString("N"));
@@ -384,6 +452,7 @@ public static class ColdWorkspaces
         finally {File.Delete(temp);File.Delete(newPrefs);}
     }
 }
+
 
 
 

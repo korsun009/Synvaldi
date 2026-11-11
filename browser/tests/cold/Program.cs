@@ -44,6 +44,7 @@ JsonObject Workspace(string id,string name,string url,bool decoration)=>new(){["
 var other=new JsonObject{["workspace-cold/11.25"]=Workspace("11.25","Local","http://127.0.0.1:49112/untouched",false)};
 ColdWorkspaces.Apply(profile,other,["11.25"]);
 var target=new JsonObject{["workspace-cold/12.5"]=Workspace("12.5","Cold fixture","http://127.0.0.1:49112/fixture",true)};
+target["workspace-cold/12.5"]!["layouts"]=new JsonArray(new JsonObject{["windowId"]=win,["id"]=tile,["tree"]=new JsonObject{["direction"]="row",["first"]=0,["second"]=1,["splitPercentage"]=37.0}});
 ColdWorkspaces.Apply(profile,target,["12.5"]);
 if(!JsonNode.DeepEquals(ColdWorkspaces.Capture(profile,["11.25"]),other) ||
    !JsonNode.DeepEquals(ColdWorkspaces.Capture(profile,["12.5"]),target))throw new Exception("Cold export differs from selected inputs");
@@ -61,6 +62,7 @@ if(Directory.Exists(resources))
         throw new Exception("Patch compatibility policy");
 }
 var moved=target.DeepClone().AsObject();
+moved["workspace-cold/12.5"]!.AsObject().Remove("layouts");
 var movedRow=moved["workspace-cold/12.5"]!["tabs"]![1]!.DeepClone();
 moved["workspace-cold/12.5"]!["tabs"]!.AsArray().RemoveAt(1);
 var otherAfterMove=other.DeepClone().AsObject();
@@ -84,6 +86,7 @@ using(var lockFile=new FileStream(session,FileMode.Open,FileAccess.ReadWrite,Fil
 }
 File.WriteAllText(Path.Combine(root,"expected.json"),target.ToJsonString());
 Console.WriteLine(root);
+
 
 
 

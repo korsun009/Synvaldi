@@ -42,6 +42,10 @@ try{
       return want.every(item=>last.some(t=>t.url===item.url&&t.pinned===item.pinned))&&last.some(t=>t.url?.includes("/untouched0"));
     },30000);
   } catch(e) {console.error("Restored fixture tabs",JSON.stringify(last));throw e;}
+  const layout=expected["workspace-cold/12.5"].layouts[0];
+  const readTree=await call(worker.webSocketDebuggerUrl,"Runtime.evaluate",{expression:"chrome.windows.getAll().then(ws=>ws.map(w=>JSON.parse(w.vivExtData||'{}')).find(w=>w.ext_id==="+JSON.stringify(layout.windowId)+")?.tiles?.["+JSON.stringify(layout.id)+"])",awaitPromise:true,returnByValue:true});
+  assert.deepEqual(readTree.result.value,layout.tree);
+  console.log("PASS: normal Vivaldi windows API reported the imported 37/63 split tree.");
   for(let attempt=0;attempt<2;attempt++){
     if(attempt)await pause(2500);
     const share=execFileSync("dotnet",["run","--no-build","--project",project,"--","--probe-sharing",root],{encoding:"utf8"}).trim();
@@ -56,5 +60,6 @@ try{
 }
 const verify=execFileSync("dotnet",["run","--project",project,"--","--verify-fixture",root],{encoding:"utf8"});
 assert.match(verify,/PASS/);console.log(verify.trim());
+
 
 

@@ -128,7 +128,23 @@ public static partial class Profiles
                     (await Rows(conn, "SELECT 1 FROM online_lease WHERE id=$1 AND session_hash=$2 AND expires_at>now()",
                         r => r.GetInt32(0), ct, lease, actor.TokenHash)).Count != 0;
                 List<string> applied = [], conflicts = [];
-                foreach (var group in input.Changes.GroupBy(c => (grouped: c.Group is not null, id: c.Group ?? c.Key)))
+                var cold = input.Changes.Where(c => c.Key.StartsWith(ColdReconciliation.Prefix, StringComparison.Ordinal)).ToArray();
+                var handled = new HashSet<string>();
+                if (cold.Length != 0 && cold.All(c => !c.Deleted && c.Group is null))
+                {
+                    var merged = await ColdReconciliation.Merge(conn, id, state.Fields, cold, ct);
+                    conflicts.AddRange(merged.Conflicts);
+                    foreach (var edit in cold) handled.Add(edit.Key);
+                    foreach (var (key, value) in merged.Values)
+                    {
+                        state.Fields.TryGetValue(key, out var old);
+                        if (old is not null && !old.Deleted && Equal(old.Value, value)) continue;
+                        state.Fields[key] = new(value, next, false, old?.GuardRevision ?? 0);
+                        applied.Add(key);
+                    }
+                }
+                foreach (var group in input.Changes.Where(c => !handled.Contains(c.Key))
+                    .GroupBy(c => (grouped: c.Group is not null, id: c.Group ?? c.Key)))
                 {
                     var edits = group.ToArray();
                     if (edits.Any(c => Conflicts(state.Fields, c, leaseValid)))
