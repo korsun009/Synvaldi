@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "manifest_version": 3,
+  "permissions": [
+    "tabs",
+    "storage",
+    "nativeMessaging",
+    "alarms"
+  ],
+  "name": "Synvaldi",
+  "description": "Связь вкладок Vivaldi с локальным агентом Synvaldi",
+  "background": {
+    "type": "module",
+    "service_worker": "background.js"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAz7mXJAU1EsCRiS+bEhDtN7DSb68k0yVnHhUclwhz9lU5cMpIH4evvnGv5+tzn+nT+GEbgHqCopPTW2JJdnH71VcNzjg3yme6wdaissFZTRT9GuIILiC8r6QcJs4zvS65Vfvgq7YXNAphGUfSXEEktaVR8h91Myc4T+jLA3/gWWlFjE+T0Z4VkRrbiPRXpsbbRARquQSpfrqlidVSIdi1gBe1Vsk0KUvZ3WzgPV4KfMiSSO6P+RvHPhnN8bM2RK6QaFdSLVLwO23OU/w+1FSBCGfO11y0XgzfY8xLBOHKXcx91wukOgbDKf8nbpTX/L3fGH5FoJbC1cdkNouAI6OLuQIDAQAB",
+  "options_ui": {
+    "open_in_tab": true,
+    "page": "status.html"
+  }
+}

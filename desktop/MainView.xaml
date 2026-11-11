@@ -1,0 +1,19 @@
+<Window x:Class="Synvaldi.MainView" x:ClassModifier="internal" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Style="{DynamicResource {x:Type Window}}" Title="Synvaldi" Icon="Assets/app.ico" Width="930" Height="680" MinWidth="690" MinHeight="475" WindowStartupLocation="CenterScreen">
+ <Grid Background="{StaticResource Paper}">
+  <Grid.ColumnDefinitions><ColumnDefinition Width="193"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+  <Border Background="#E9EBDD" BorderBrush="#D2D8C8" BorderThickness="0,0,1,0">
+   <DockPanel Margin="15,25,15,18">
+    <Image Source="Assets/wordmark.png" Width="147" Height="42" HorizontalAlignment="Left" Margin="3,0,0,26" Stretch="Uniform" DockPanel.Dock="Top"/>
+    <TextBlock DockPanel.Dock="Bottom" Text="Synvaldi   ·   0.1.0" FontSize="12" Foreground="#506259" Margin="9,12,0,0"/>
+    <StackPanel x:Name="Nav"/>
+   </DockPanel>
+  </Border>
+  <Grid Grid.Column="1" Margin="29,24,27,16">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <TextBlock x:Name="Heading" FontSize="30" FontWeight="SemiBold" Margin="0,0,0,16"/>
+   <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel x:Name="Body" Margin="0,0,8,10"/></ScrollViewer>
+   <Border Grid.Row="2" Padding="10,7" CornerRadius="6" Background="#E4EBE1" Margin="0,9,0,0"><TextBlock x:Name="Status" FontSize="12" Foreground="#2F5145" TextTrimming="CharacterEllipsis" MaxHeight="49"/></Border>
+  </Grid>
+ </Grid>
+</Window>
