@@ -1,0 +1,14 @@
+services:
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "${SYNVALDI_TUNNEL_IP:?Set private tunnel address}:48184:8443"
+    volumes:
+      - "${SYNVALDI_TLS_DIR:?Set certificate directory}:/etc/synvaldi/tls:ro"
+      - "${SYNVALDI_CADDYFILE:?Set absolute gateway config path}:/etc/caddy/Caddyfile:ro"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp, /data, /config]
