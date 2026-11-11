@@ -1,0 +1,8 @@
+bin
+obj
+tests
+.env
+.env.*
+*.user
+secrets
+

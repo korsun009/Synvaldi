@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: synvaldi
+      POSTGRES_USER: synvaldi
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synvaldi -d synvaldi"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  api:
+    build: .
+    restart: unless-stopped
+    environment:
+      SYNVALDI_DB: Host=db;Database=synvaldi;Username=synvaldi
+      SYNVALDI_DB_PASSWORD_FILE: /run/secrets/db_password
+      SYNVALDI_REGISTRATION: ${SYNVALDI_REGISTRATION:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${SYNVALDI_PORT:-8184}:8080"
+    secrets: [db_password]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+volumes:
+  postgres:
+secrets:
+  db_password:
+    file: ${SYNVALDI_DB_PASSWORD_PATH:?Set path to PostgreSQL password file}
+
