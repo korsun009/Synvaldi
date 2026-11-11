@@ -87,7 +87,7 @@ internal static class NoteAttachments
         var notes=JsonNode.Parse(await File.ReadAllBytesAsync(file))!.AsObject();
         var checksum=Checksums(notes);
         if(notes["checksum"]?.ToString()!=checksum.Md5 || notes["checksum_sha256"]?.ToString()!=checksum.Sha)
-            throw new InvalidDataException("Ôîðìàò çàìåòîê èçìåíèëñÿ; çàïèñü îòëîæåíà.");
+            throw new InvalidDataException("Ð¤Ð¾Ñ€Ð¼Ð°Ñ‚ Ð·Ð°Ð¼ÐµÑ‚Ð¾Ðº Ð¸Ð·Ð¼ÐµÐ½Ð¸Ð»ÑÑ; Ð·Ð°Ð¿Ð¸ÑÑŒ Ð¾Ñ‚Ð»Ð¾Ð¶ÐµÐ½Ð°.");
         var old=notes.DeepClone();
         var all=Nodes(notes).ToList();
         var parents=all.Where(n=>n["type"]?.ToString()=="note").ToDictionary(n=>n["guid"]!.ToString(),StringComparer.OrdinalIgnoreCase);

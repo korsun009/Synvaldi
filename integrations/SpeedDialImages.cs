@@ -48,7 +48,11 @@ internal static class SpeedDialImages
         bool changed=false;
         foreach(var(key,value) in incoming)
         {
-            if(!bookmarks.TryGetValue(key[Field.Length..],out var item))continue;
+            if(!bookmarks.TryGetValue(key[Field.Length..],out var item))
+            {
+                if(value==null)continue;
+                throw new IOException("Ожидается закладка с изображением от штатной синхронизации.");
+            }
             if(item["meta_info"] is not JsonObject meta)item["meta_info"]=meta=new JsonObject();
             if(value==null){
                 if(meta["Thumbnail"]?.ToString().StartsWith(Prefix,StringComparison.Ordinal)==true)changed|=meta.Remove("Thumbnail");

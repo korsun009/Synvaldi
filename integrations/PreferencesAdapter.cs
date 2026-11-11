@@ -86,8 +86,8 @@ public static class PreferencesAdapter
         var binary = Path.Combine(app,"vivaldi.exe");
         string? version = File.Exists(binary) ? FileVersionInfo.GetVersionInfo(binary).ProductVersion : null;
         var file = Path.Combine(app,version ?? "", "resources","vivaldi","prefs_definitions.json");
-        if(!File.Exists(file)) throw new IOException("Для этой версии Vivaldi пока неизвестен перечень настроек штатного Sync.");
-        return (Read(file)["syncable"] as JsonObject ?? throw new InvalidDataException("Схема Sync изменилась."))
+        if(!File.Exists(file)) throw new IOException("Р”Р»СЏ СЌС‚РѕР№ РІРµСЂСЃРёРё Vivaldi РїРѕРєР° РЅРµРёР·РІРµСЃС‚РµРЅ РїРµСЂРµС‡РµРЅСЊ РЅР°СЃС‚СЂРѕРµРє С€С‚Р°С‚РЅРѕРіРѕ Sync.");
+        return (Read(file)["syncable"] as JsonObject ?? throw new InvalidDataException("РЎС…РµРјР° Sync РёР·РјРµРЅРёР»Р°СЃСЊ."))
             .Select(k=>k.Key).ToHashSet(StringComparer.Ordinal);
     }
 
@@ -145,7 +145,7 @@ public static class PreferencesAdapter
     }
     static void CheckCold(string profilePath)
     {
-        if(OperatingSystem.IsWindows() && ProfileInUse(profilePath))throw new IOException("Настройки ожидают закрытия Vivaldi.");
+        if(OperatingSystem.IsWindows() && ProfileInUse(profilePath))throw new IOException("РќР°СЃС‚СЂРѕР№РєРё РѕР¶РёРґР°СЋС‚ Р·Р°РєСЂС‹С‚РёСЏ Vivaldi.");
     }
 
     public static async Task Apply(string profilePath,string[] enabledCategories,JsonObject fields,string assetsRoot,Func<string,Task<byte[]>> download)
