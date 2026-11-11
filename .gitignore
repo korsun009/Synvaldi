@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+.env
+*.pfx
+*.pem
+*.key
+*.db
+publish/
+dist/
+node_modules/
+__pycache__/
+artifacts/
