@@ -48,3 +48,11 @@ test("events during browser shutdown do not generate bulk deletion",async () => 
   assert.deepEqual(s.outbox,[]);
   assert.deepEqual(s.baseline,{[id]:tab});
 });
+test("a partially initialized browser window cannot erase the persisted mirror",async () => {
+  const state=newState();state.baseline[id]=tab;
+  const m=new Mirror({windows:{getAll:async()=>[{id:50,incognito:false,type:"normal",tabs:[{id:51,url:""}]}]}},state,async()=>{});
+  m.config={enabled:true,selection:"all",capture:true};
+  await m.capture();
+  assert.deepEqual(state.outbox,[]);
+  assert.deepEqual(state.baseline,{[id]:tab});
+});

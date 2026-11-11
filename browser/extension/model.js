@@ -75,8 +75,8 @@ export class Mirror {
     this.config = null;
   }
 
-  async scan() {
-    const windows = await this.browser.windows.getAll({populate: true, windowTypes: ["normal"]});
+  async scan(suppliedWindows) {
+    const windows = suppliedWindows ?? await this.browser.windows.getAll({populate: true, windowTypes: ["normal"]});
     const records = {};
     const slots = new Map();
     for (const [id,value] of Object.entries(this.s.baseline)) {
@@ -123,8 +123,10 @@ export class Mirror {
   async capture() {
     assertActive(this.config);
     if (this.config.capture === false || this.s.inflight) return;
-    if (!(await this.browser.windows.getAll({windowTypes: ["normal"]})).some(w => !w.incognito)) return;
-    const {records} = await this.scan();
+    const windows = await this.browser.windows.getAll({populate:true,windowTypes:["normal"]});
+    // During startup/shutdown a normal window can exist before any page is ready.
+    if (!windows.some(w=>!w.incognito && w.tabs?.some(t=>t.pendingUrl || t.url))) return;
+    const {records} = await this.scan(windows);
     const changes = changesBetween(this.s.baseline, records);
     if (changes.length) {
       // Native frames have bounded size; queue separate retryable chunks.
@@ -253,6 +255,7 @@ export class Mirror {
     await this.browser.tabs.update(tab.id, {active: true});
   }
 }
+
 
 
 
